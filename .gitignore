@@ -1,0 +1,7 @@
+*.env
+.claude
+/removefiles
+/models
+*/cache
+*/output
+*__pycache__

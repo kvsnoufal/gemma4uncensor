@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>refusal removal Pipeline — Gemma 4 E2B</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400&display=swap');
+  :root{--bg:#f8f9fc;--s:#ffffff;--s2:#f1f3f8;--bd:#dfe3ed;--t:#1e293b;--tm:#64748b;--tl:#94a3b8;--blue:#2563eb;--cyan:#0891b2;--purple:#7c3aed;--amber:#d97706;--green:#059669;--rose:#e11d48;--pink:#db2777}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--t);font-family:'Inter',sans-serif;font-weight:300;line-height:1.4;height:100vh;overflow:hidden}
+  .page{width:1280px;max-width:100vw;margin:0 auto;padding:14px 24px 10px;display:flex;flex-direction:column;height:100vh}
+
+  .hdr{text-align:center;margin-bottom:8px}
+  .hdr h1{font-size:19px;font-weight:700;letter-spacing:-.8px;color:var(--t);margin-bottom:3px}
+  .hdr p{font-size:10.5px;color:var(--tm);max-width:720px;margin:0 auto;font-weight:300}
+  .hdr p b{color:var(--cyan);font-weight:500}
+  .tag{display:inline-flex;gap:4px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:300;color:var(--tm);background:var(--s);border:1px solid var(--bd);border-radius:4px;padding:2px 8px;margin-top:4px}
+  .tag .dot{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 5px rgba(5,150,105,.4)}
+
+  .flow-col{display:flex;flex-direction:column;flex:1;min-height:0;gap:0}
+  .row{display:flex;align-items:stretch;gap:0;flex:1;min-height:0}
+
+  /* Arrow connectors */
+  .arrow-h{display:flex;align-items:center;justify-content:center;width:24px;flex-shrink:0;color:var(--bd)}
+  .arrow-h svg{width:16px;height:16px}
+
+  /* Bend connector: step 4 down to step 5 (right-aligned) */
+  .bend{display:flex;justify-content:flex-end;padding-right:48px;height:18px;flex-shrink:0}
+  .bend svg{color:var(--bd)}
+
+  /* Cards */
+  .card{background:var(--s);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;position:relative;overflow:hidden;display:flex;flex-direction:column;flex:1;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:8px 8px 0 0}
+  .card.bl::before{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+  .card.pu::before{background:linear-gradient(90deg,var(--purple),var(--pink))}
+  .card.am::before{background:linear-gradient(90deg,var(--amber),#ea580c)}
+  .card.gr::before{background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .card.ro::before{background:linear-gradient(90deg,var(--rose),var(--pink))}
+
+  .ch{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .num{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0}
+  .bl .num{background:rgba(37,99,235,.08);color:var(--blue)}
+  .pu .num{background:rgba(124,58,237,.08);color:var(--purple)}
+  .am .num{background:rgba(217,119,6,.08);color:var(--amber)}
+  .gr .num{background:rgba(5,150,105,.08);color:var(--green)}
+  .ro .num{background:rgba(225,29,72,.08);color:var(--rose)}
+  .ch h2{font-size:10.5px;font-weight:600;flex:1;color:var(--t);letter-spacing:-.1px}
+
+  .card p{font-size:9.5px;color:var(--tm);line-height:1.45;margin-bottom:4px;font-weight:300}
+  .card p b{color:var(--t);font-weight:500}
+
+  .fb{background:var(--s2);border:1px solid var(--bd);border-radius:5px;padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:300;line-height:1.65;color:#475569}
+  .fb .c{color:var(--tl);font-style:italic;font-size:8.5px}
+  .fb .h{color:var(--cyan);font-weight:400}
+  .fb .v{color:var(--amber);font-weight:400}
+  .fb .o{color:var(--purple);font-weight:400}
+
+  .hint{display:flex;gap:4px;align-items:baseline;margin-top:auto;padding-top:4px;font-size:8.5px;color:var(--tl);font-weight:300}
+  .hint b{color:var(--tm);font-weight:500}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:3px}
+  .col{background:var(--s2);border:1px solid var(--bd);border-radius:4px;padding:3px 6px}
+  .col .lbl{font-size:8px;font-weight:500;letter-spacing:.6px;text-transform:uppercase}
+  .col.bad .lbl{color:var(--rose)}
+  .col.good .lbl{color:var(--green)}
+  .col .items{font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:300;color:#475569}
+  .col .items span{font-family:'Inter',sans-serif;font-size:7.5px;color:var(--tl);font-weight:300}
+
+  .result{background:linear-gradient(135deg,#fff,rgba(5,150,105,.03));border-color:rgba(5,150,105,.25)}
+
+  /* Bottom bar */
+  .bottom{display:flex;gap:8px;margin-top:8px;flex-shrink:0;align-items:stretch}
+
+  .algo{background:linear-gradient(135deg,rgba(124,58,237,.04),rgba(37,99,235,.04));border:1px solid rgba(124,58,237,.15);border-radius:8px;padding:8px 14px;flex:1}
+  .algo h3{font-size:9.5px;font-weight:600;margin-bottom:6px;color:var(--t);display:flex;align-items:center;gap:5px}
+  .algo h3 svg{flex-shrink:0}
+  .steps{display:grid;grid-template-columns:repeat(8,1fr);gap:0}
+  .st{display:flex;flex-direction:column;gap:2px;padding:0 6px;border-left:1px solid rgba(124,58,237,.08)}
+  .st:first-child{border-left:none;padding-left:0}
+  .st .sn{width:16px;height:16px;border-radius:4px;background:rgba(124,58,237,.07);color:var(--purple);font-size:8.5px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .st .sx{font-size:8.5px;color:var(--tm);line-height:1.4;font-weight:300}
+  .st .sx code{font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:300;color:var(--cyan)}
+  .st .sx b{font-weight:500;color:var(--t)}
+
+  .stats{display:flex;flex-direction:row;gap:6px;flex-shrink:0}
+  .stat{background:var(--s);border:1px solid var(--bd);border-radius:8px;padding:6px 14px;text-align:center;display:flex;flex-direction:column;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .stat .v{font-size:18px;font-weight:700;letter-spacing:-1px;background:linear-gradient(135deg,var(--cyan),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .stat .l{font-size:7px;color:var(--tl);text-transform:uppercase;letter-spacing:.5px;font-weight:400}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hdr">
+    <h1>Removing Refusal Directions from Transformer Weights</h1>
+    <p>Find a hidden-state direction that <b>separates harmful from harmless prompts</b> at each layer, then stop the model from writing along it through its residual write-back matrices.</p>
+    <div class="tag"><span class="dot"></span> Gemma 4 E2B &middot; 35 layers &middot; dim 1536 &middot; fp16 MPS</div>
+  </div>
+
+  <div class="flow-col">
+
+    <!-- Row 1: Steps 1 → 2 → 3 → 4 -->
+    <div class="row">
+
+      <div class="card bl">
+        <div class="ch"><div class="num">01</div><h2>Collect Prompts</h2></div>
+        <p>Two prompt sets, <b>both through the same model</b>.</p>
+        <div class="cols">
+          <div class="col bad"><div class="lbl">&#10005; Harmful</div><div class="items">x&#8321;, x&#8322; &hellip; x<sub>N</sub><br><span>200 harmful_behaviors</span></div></div>
+          <div class="col good"><div class="lbl">&#10003; Harmless</div><div class="items">y&#8321;, y&#8322; &hellip; y<sub>M</sub><br><span>200 alpaca</span></div></div>
+        </div>
+      </div>
+
+      <div class="arrow-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M13 5l6 7-6 7"/></svg></div>
+
+      <div class="card pu">
+        <div class="ch"><div class="num">02</div><h2>Capture Activations</h2></div>
+        <p>Hook every layer, grab <b>last-token hidden state</b>.</p>
+        <div class="fb">
+          <span class="v">H<sub>&#8467;</sub></span> <span class="o">=</span> harmful acts &ensp;<span class="v">S<sub>&#8467;</sub></span> <span class="o">=</span> harmless acts<br>
+          <span class="c">shape [200, 35, 1536] on CPU</span>
+        </div>
+        <div class="hint">Intent (refuse/comply) encoded at last token position</div>
+      </div>
+
+      <div class="arrow-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M13 5l6 7-6 7"/></svg></div>
+
+      <div class="card am">
+        <div class="ch"><div class="num">03</div><h2>Winsorize</h2></div>
+        <p>Clamp outliers so extremes don't skew the mean.</p>
+        <div class="fb">
+          <span class="v">q</span> <span class="o">=</span> quantile(|<span class="v">x</span>|, <span class="h">0.995</span>)<br>
+          <span class="v">x</span> <span class="o">=</span> clamp(<span class="v">x</span>, &minus;<span class="v">q</span>, <span class="v">q</span>)
+        </div>
+        <div class="hint">Robust mean with 99.5% of information retained</div>
+      </div>
+
+      <div class="arrow-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M13 5l6 7-6 7"/></svg></div>
+
+      <div class="card bl">
+        <div class="ch"><div class="num">04</div><h2>Centroids &amp; Difference</h2></div>
+        <p>Average each class, difference = <b>raw refusal direction</b>.</p>
+        <div class="fb">
+          <span class="v">&mu;<sub>H</sub></span> <span class="o">=</span> mean(<span class="v">H*</span>) &ensp;<span class="v">&mu;<sub>S</sub></span> <span class="o">=</span> mean(<span class="v">S*</span>)<br>
+          <span class="h">&Delta;<sub>&#8467;</sub></span> <span class="o">=</span> <span class="v">&mu;<sub>H,&#8467;</sub></span> <span class="o">&minus;</span> <span class="v">&mu;<sub>S,&#8467;</sub></span>
+        </div>
+        <div class="hint">&Delta; points from harmless toward harmful at each layer</div>
+      </div>
+
+    </div>
+
+    <!-- Bend arrow: from step 4 (right) down and across to step 5 (left of row 2) -->
+    <div class="bend">
+      <svg width="940" height="18" viewBox="0 0 940 18" fill="none">
+        <path d="M 920 1 L 920 9 L 20 9 L 20 17" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 2" fill="none"/>
+        <path d="M 14 12 L 20 18 L 26 12" stroke="currentColor" stroke-width="1.2" fill="none"/>
+      </svg>
+    </div>
+
+    <!-- Row 2: Steps 5 → 6 → 7 → 8 -->
+    <div class="row">
+
+      <div class="card pu">
+        <div class="ch"><div class="num">05</div><h2>Orthogonalize</h2></div>
+        <p>Remove overlap with harmless &mdash; keep <b>only refusal-specific</b> signal.</p>
+        <div class="fb">
+          <span class="v">&#x0125;<sub>&#8467;</sub></span> <span class="o">=</span> <span class="v">&mu;<sub>S</sub></span> / &#x2016;<span class="v">&mu;<sub>S</sub></span>&#x2016;<br>
+          <span class="v">r</span> <span class="o">=</span> <span class="v">&Delta;</span> <span class="o">&minus;</span> (<span class="v">&Delta;</span> &middot; <span class="v">&#x0125;</span>) <span class="v">&#x0125;</span> &ensp;<span class="c">&times;2 passes</span><br>
+          <span class="h">r&#x0302;<sub>&#8467;</sub></span> <span class="o">=</span> <span class="v">r</span> / &#x2016;<span class="v">r</span>&#x2016; &ensp;<span class="c">unit refusal dir</span>
+        </div>
+        <div class="hint">Clean unit vector per layer, orthogonal to helpful behavior</div>
+      </div>
+
+      <div class="arrow-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M13 5l6 7-6 7"/></svg></div>
+
+      <div class="card ro">
+        <div class="ch"><div class="num">06</div><h2>Project Out of Weights</h2></div>
+        <p>Edit <b>o_proj</b> + <b>down_proj</b> to block the refusal direction.</p>
+        <div class="fb">
+          <span class="h">P<sub>&#8467;</sub></span> <span class="o">=</span> <span class="v">I</span> <span class="o">&minus;</span> <span class="v">r&#x0302;</span> <span class="v">r&#x0302;</span><sup>&#x22A4;</sup> &ensp;<span class="c">projector</span><br>
+          <span class="h">W&prime;</span> <span class="o">=</span> <span class="v">P</span><span class="v">W</span> &ensp;<span class="c">= W &minus; r&#x0302;(r&#x0302;&#x1D40;W)</span>
+        </div>
+        <div class="hint">Writes every direction <em>except</em> r&#x0302;<sub>&#8467;</sub></div>
+      </div>
+
+      <div class="arrow-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M13 5l6 7-6 7"/></svg></div>
+
+      <div class="card am">
+        <div class="ch"><div class="num">07</div><h2>Restore Row Norms</h2></div>
+        <p>Rescale each row to its <b>original magnitude</b>.</p>
+        <div class="fb">
+          <span class="h">row&prime;<sub>i</sub></span> <span class="o">=</span> <span class="v">proj<sub>i</sub></span> <span class="o">&times;</span> &#x2016;<span class="v">old<sub>i</sub></span>&#x2016; / &#x2016;<span class="v">new<sub>i</sub></span>&#x2016;
+        </div>
+        <div class="hint">Prevents degraded output from shrunk magnitudes</div>
+      </div>
+
+      <div class="arrow-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M13 5l6 7-6 7"/></svg></div>
+
+      <div class="card gr result">
+        <div class="ch"><div class="num">08</div><h2>Repeat &times; 35 Layers</h2></div>
+        <p>Each layer uses its <b>own r&#x0302;<sub>&#8467;</sub></b>.</p>
+        <div class="fb" style="text-align:center">
+          <span class="h">35</span> layers <span class="o">&times;</span> <span class="h">2</span> matrices <span class="o">=</span> <span class="h">70</span> edits
+        </div>
+        <div class="hint" style="color:var(--green)"><b>&#10003;</b> Refusals drop, coherence preserved</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="bottom">
+    <div class="algo">
+      <h3>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Algorithm at a Glance
+      </h3>
+      <div class="steps">
+        <div class="st"><div class="sn">1</div><div class="sx"><b>Collect</b> harmful <code>H<sub>&#8467;</sub></code> and harmless <code>S<sub>&#8467;</sub></code> prompt sets</div></div>
+        <div class="st"><div class="sn">2</div><div class="sx"><b>Hook</b> each layer, capture last-token activations</div></div>
+        <div class="st"><div class="sn">3</div><div class="sx"><b>Winsorize</b> at <code>q=0.995</code> to clip outlier dimensions</div></div>
+        <div class="st"><div class="sn">4</div><div class="sx"><b>Centroids</b> <code>&mu;<sub>H</sub></code>, <code>&mu;<sub>S</sub></code> then diff <code>&Delta;=&mu;<sub>H</sub>&minus;&mu;<sub>S</sub></code></div></div>
+        <div class="st"><div class="sn">5</div><div class="sx"><b>Orthogonalize</b> &Delta; against harmless mean &rarr; clean <code>r&#x0302;<sub>&#8467;</sub></code></div></div>
+        <div class="st"><div class="sn">6</div><div class="sx"><b>Project</b> r&#x0302; out of <code>o_proj</code> &amp; <code>down_proj</code> weights</div></div>
+        <div class="st"><div class="sn">7</div><div class="sx"><b>Rescale</b> each row to preserve original norm</div></div>
+        <div class="st"><div class="sn">8</div><div class="sx"><b>Repeat</b> for all 35 layers, verify before/after</div></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="v">35</div><div class="l">Layers</div></div>
+      <div class="stat"><div class="v">70</div><div class="l">Modules</div></div>
+      <div class="stat"><div class="v">1536</div><div class="l">Hidden</div></div>
+      <div class="stat"><div class="v">400</div><div class="l">Prompts</div></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
