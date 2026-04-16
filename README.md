@@ -1,6 +1,18 @@
 # Gemma 4 E2B — refusal removal (Uncensoring)
 
+Removing "censorship" or refusal guardrails from gemma 4. 
+
+Idea is to identify safety/refusal behaviour representation in the model weights and surgically modify them. 
+
+## Approach: 
+- run both harmful and harmless prompts through the model
+- intercept outputs of all attention layers and compare layer by layer to identify suppression behaviour 
+- isolate refusal behaviour from harmless behaviour 
+- edit weights along this direction to suppress this behaviour
+
 ![Removing refusal directions from transformer weights — pipeline overview](notebooks/image.png)
+
+
 
 This repository is a **hands-on study** of how to **reduce model refusals** (“uncensor” in the sense of weight edits, not retraining) for **Gemma 4 E2B IT** by estimating a per-layer refusal-related direction from activations and **projecting it out of** `o_proj` and `down_proj` while **preserving row norms**. The method follows the **norm-preserving biprojected abliteration** line of work documented upstream.
 
